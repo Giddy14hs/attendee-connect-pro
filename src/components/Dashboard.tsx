@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Calendar, Users, Ticket, TrendingUp, DollarSign, Clock } from 'lucide-react';
+import { Calendar, Users, Ticket, TrendingUp, DollarSign, Clock, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
