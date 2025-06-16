@@ -19,7 +19,7 @@ const Attendees = ({ onPageChange }: AttendeesProps) => {
     {
       id: 1,
       name: 'John Smith',
-      email: 'john.smith@email.com',
+      email: 'john.smith@gmail.com',
       event: 'Tech Conference 2024',
       ticketType: 'VIP',
       status: 'confirmed',
@@ -29,7 +29,7 @@ const Attendees = ({ onPageChange }: AttendeesProps) => {
     {
       id: 2,
       name: 'Sarah Johnson',
-      email: 'sarah.j@email.com',
+      email: 'sarah.j@gmail.com',
       event: 'Music Festival',
       ticketType: 'Regular',
       status: 'pending',
@@ -39,7 +39,7 @@ const Attendees = ({ onPageChange }: AttendeesProps) => {
     {
       id: 3,
       name: 'Mike Davis',
-      email: 'mike.davis@email.com',
+      email: 'mike.davis@gmail.com',
       event: 'Business Summit',
       ticketType: 'Early Bird',
       status: 'confirmed',
@@ -49,7 +49,7 @@ const Attendees = ({ onPageChange }: AttendeesProps) => {
     {
       id: 4,
       name: 'Emily Chen',
-      email: 'emily.chen@email.com',
+      email: 'emily.chen@gmail.com',
       event: 'Tech Conference 2024',
       ticketType: 'Regular',
       status: 'waitlist',
