@@ -8,11 +8,12 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Proxy API requests to the PHP backend
     proxy: {
       '/api': {
-        target: 'http://localhost:80',
+        target: 'http://localhost:8000',
         changeOrigin: true,
-        secure: false,
+        secure: false
       }
     }
   },

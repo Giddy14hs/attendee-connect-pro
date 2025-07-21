@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Users, Ticket, Mail, Search, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,22 @@ interface LayoutProps {
 
 const Layout = ({ children, currentPage = 'dashboard', onPageChange }: LayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    } else {
+      setUser(null);
+    }
+  }, [currentPage]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    onPageChange?.('dashboard');
+  };
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Calendar },
@@ -79,15 +95,45 @@ const Layout = ({ children, currentPage = 'dashboard', onPageChange }: LayoutPro
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-slate-50">
           <h3 className="text-sm font-semibold text-slate-900 mb-3">Relevant Links</h3>
           <div className="space-y-1">
-            {quickLinks.map((link) => (
+            {user ? (
+              <>
+                <a
+                  href="#dashboard"
+                  className="block text-sm text-slate-600 hover:text-blue-600 transition-colors py-1"
+                  onClick={() => { onPageChange?.('dashboard'); setSidebarOpen(false); }}
+                >
+                  Dashboard
+                </a>
+                <a
+                  href="#events"
+                  className="block text-sm text-slate-600 hover:text-blue-600 transition-colors py-1"
+                  onClick={() => { onPageChange?.('events'); setSidebarOpen(false); }}
+                >
+                  Events
+                </a>
+                <a
+                  href="#tickets"
+                  className="block text-sm text-slate-600 hover:text-blue-600 transition-colors py-1"
+                  onClick={() => { onPageChange?.('tickets'); setSidebarOpen(false); }}
+                >
+                  My Tickets
+                </a>
+                <button
+                  className="block w-full text-left text-sm text-red-600 hover:text-red-800 transition-colors py-1"
+                  onClick={() => { handleLogout(); setSidebarOpen(false); }}
+                >
+                  Log Out
+                </button>
+              </>
+            ) : (
               <a
-                key={link.label}
-                href={link.href}
+                href="#auth"
                 className="block text-sm text-slate-600 hover:text-blue-600 transition-colors py-1"
+                onClick={() => { onPageChange?.('auth'); setSidebarOpen(false); }}
               >
-                {link.label}
+                Login/Signup
               </a>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -117,6 +163,18 @@ const Layout = ({ children, currentPage = 'dashboard', onPageChange }: LayoutPro
             </div>
 
             <div className="flex items-center space-x-4">
+              {user ? (
+                <>
+                  <span className="text-slate-700 font-medium hidden sm:inline">Hi, {user.full_name || user.email || 'User'}</span>
+                  <Button
+                    onClick={handleLogout}
+                    variant="outline"
+                    className="hidden sm:inline-flex"
+                  >
+                    Log Out
+                  </Button>
+                </>
+              ) : (
               <Button
                 onClick={() => onPageChange?.('auth')}
                 variant="outline"
@@ -124,6 +182,7 @@ const Layout = ({ children, currentPage = 'dashboard', onPageChange }: LayoutPro
               >
                 Login / Signup
               </Button>
+              )}
               <Button
                 onClick={() => onPageChange?.('buy-ticket')}
                 className="gradient-primary text-white border-0 hover:opacity-90"

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar, MapPin, Clock, Users, DollarSign, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,11 +27,35 @@ const CreateEvent = ({ onPageChange }: CreateEventProps) => {
     ]
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Event data:', eventData);
-    // Handle form submission here
-    onPageChange?.('events');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    try {
+      const res = await fetch('/api/event_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_event',
+          title: eventData.name,
+          description: eventData.description,
+          date: eventData.date,
+          time: eventData.time,
+          location: eventData.location,
+          max_attendees: eventData.maxAttendees,
+          category: eventData.category,
+          organizer_id: user.id || user.email, // fallback to email if id is not available
+          ticket_types: eventData.ticketTypes
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onPageChange?.('events');
+      } else {
+        alert(data.error || 'Failed to create event');
+      }
+    } catch (err) {
+      alert('Network error');
+    }
   };
 
   const updateTicketType = (index: number, field: string, value: string) => {

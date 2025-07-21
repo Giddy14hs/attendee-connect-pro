@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User, Mail, Lock, UserPlus, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AuthButton from './AuthButton';
 
 interface AuthProps {
   onPageChange?: (page: string) => void;
@@ -24,18 +24,61 @@ const Auth = ({ onPageChange }: AuthProps) => {
     confirmPassword: ''
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login data:', loginData);
-    // Handle login logic here
-    onPageChange?.('dashboard');
+    try {
+      const res = await fetch('/api/user_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', email: loginData.email, password: loginData.password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('user', JSON.stringify({
+          name: data.full_name || '',
+          email: loginData.email,
+          role: data.role
+        }));
+        onPageChange?.('dashboard');
+      } else {
+        alert(data.error || 'Login failed');
+      }
+    } catch (err) {
+      alert('Network error');
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Signup data:', signupData);
-    // Handle signup logic here
-    onPageChange?.('dashboard');
+    if (signupData.password !== signupData.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+    try {
+      const res = await fetch('/api/user_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'register',
+          full_name: signupData.name,
+          email: signupData.email,
+          password: signupData.password
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('user', JSON.stringify({
+          name: signupData.name,
+          email: signupData.email,
+          role: 'user'
+        }));
+        onPageChange?.('dashboard');
+      } else {
+        alert(data.error || 'Signup failed');
+      }
+    } catch (err) {
+      alert('Network error');
+    }
   };
 
   return (
@@ -202,13 +245,9 @@ const Auth = ({ onPageChange }: AuthProps) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="w-full">
-                  Google
-                </Button>
-                <Button variant="outline" className="w-full">
-                  GitHub
-                </Button>
+              {/* Replace Google/GitHub with Eventbrite login */}
+              <div className="flex justify-center">
+                <AuthButton />
               </div>
             </div>
           </CardContent>

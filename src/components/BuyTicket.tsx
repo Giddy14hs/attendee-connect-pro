@@ -66,6 +66,14 @@ const BuyTicket = ({ onPageChange }: BuyTicketProps) => {
       alert('Please select a ticket type');
       return;
     }
+    // Add login check before proceeding to payment step
+    if (step === 1) {
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      if (!user) {
+        alert('Please log in or sign up to buy tickets.');
+        return;
+      }
+    }
     if (step === 2) {
        if (!paymentData.email || !paymentData.firstName || !paymentData.lastName || !paymentData.cardNumber || !paymentData.expiryDate || !paymentData.cvv || !paymentData.billingAddress) {
         alert('Please fill in all payment details');
@@ -82,6 +90,33 @@ const BuyTicket = ({ onPageChange }: BuyTicketProps) => {
   const calculateTotal = () => {
     const ticket = ticketTypes.find(t => t.id === selectedTicket);
     return ticket ? ticket.price * quantity : 0;
+  };
+
+  const handleComplete = async () => {
+    // 1. Register user if not exists
+    try {
+      const resUser = await fetch('/api/user_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'register_from_ticket', email: paymentData.email, name: paymentData.firstName + ' ' + paymentData.lastName })
+      });
+      await resUser.json();
+      // 2. Get userId (optional: you may want to fetch user by email or store in localStorage)
+      // For now, just use email as identifier
+      // 3. Register for event (replace 1 with actual eventId)
+      const eventId = 1; // TODO: Replace with actual eventId from props or context
+      const resReg = await fetch('/api/user_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'register_for_event', userId: paymentData.email, eventId })
+      });
+      const data = await resReg.json();
+      if (!resReg.ok) {
+        alert(data.error || 'Failed to register for event');
+      }
+    } catch (err) {
+      alert('Network error');
+    }
   };
 
   const renderStepContent = () => {

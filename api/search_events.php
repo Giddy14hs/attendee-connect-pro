@@ -4,51 +4,60 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
+require_once 'config.php';
+
 // Get the search query from the request
 $searchQuery = isset($_GET['q']) ? $_GET['q'] : '';
 $location = isset($_GET['location']) ? $_GET['location'] : '';
 
-// Eventbrite API configuration
-$eventbriteToken = getenv('EVENTBRITE_TOKEN');
-$apiUrl = 'https://www.eventbriteapi.com/v3/events/search/';
+// Get database connection
+$conn = getDBConnection();
 
-// Prepare the API request
-$params = [
-    'q' => $searchQuery,
-    'expand' => 'venue',
-    'sort_by' => 'date',
-];
-
-if (!empty($location)) {
-    $params['location.address'] = $location;
-}
-
-// Add the token to the URL
-$apiUrl .= '?' . http_build_query($params);
-
-// Initialize cURL session
-$ch = curl_init();
-
-// Set cURL options
-curl_setopt($ch, CURLOPT_URL, $apiUrl);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'Authorization: Bearer ' . $eventbriteToken,
-    'Content-Type: application/json'
-]);
-
-// Execute the request
-$response = curl_exec($ch);
-
-// Check for errors
-if (curl_errno($ch)) {
+if ($conn === null) {
     http_response_code(500);
-    echo json_encode(['error' => 'Failed to fetch events: ' . curl_error($ch)]);
+    echo json_encode(['error' => 'Database connection failed']);
     exit;
 }
 
-// Close cURL session
-curl_close($ch);
+// Prepare the SQL query
+$sql = "SELECT * FROM events WHERE 1=1";
+$params = [];
+$types = "";
 
-// Return the response
-echo $response; 
+if (!empty($searchQuery)) {
+    $sql .= " AND (title LIKE ? OR description LIKE ?)";
+    $searchParam = "%$searchQuery%";
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $types .= "ss";
+}
+
+if (!empty($location)) {
+    $sql .= " AND location LIKE ?";
+    $params[] = "%$location%";
+    $types .= "s";
+}
+
+// Prepare and execute the statement
+$stmt = $conn->prepare($sql);
+
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+
+$stmt->execute();
+$result = $stmt->get_result();
+
+// Fetch all results
+$events = [];
+while ($row = $result->fetch_assoc()) {
+    $events[] = $row;
+}
+
+// Close the statement and connection
+$stmt->close();
+$conn->close();
+
+// Return the results
+echo json_encode(['events' => $events]);
+?> 

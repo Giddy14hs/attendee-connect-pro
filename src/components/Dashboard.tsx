@@ -5,45 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useDebounce } from '@/hooks/useDebounce';
-
-interface EventbriteEvent {
-  id: string;
-  name: {
-    text: string;
-  };
-  description: {
-    text: string;
-  } | string;
-  start: {
-    local: string;
-  };
-  end: {
-    local: string;
-  };
-  logo: {
-    url: string;
-  };
-  venue: {
-    name: string;
-    address: {
-      city: string;
-      region: string;
-    };
-  };
-  ticket_availability: {
-    is_sold_out: boolean;
-  };
-  url: string;
-  // Additional properties for static data
-  title?: string;
-  date?: string;
-  location?: string;
-  price?: string;
-  image?: string;
-  organizer?: string;
-  attendees?: number;
-  rating?: number;
-}
+import { getBackendEvents, EventbriteEvent, testApiConnection, getEvents } from '@/services/eventbrite';
 
 interface DashboardProps {
   onPageChange?: (page: string) => void;
@@ -55,6 +17,7 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
   const [otherEvents, setOtherEvents] = useState<EventbriteEvent[]>([]);
   const [recommendedEvents, setRecommendedEvents] = useState<EventbriteEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [apiTestResult, setApiTestResult] = useState<any>(null);
 
   // State for search
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,37 +28,42 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
   // Example: use browser location or fallback
   const userLocation = 'San Francisco, CA';
 
-  // Fetch initial events
+  // Test API connection
+  const handleTestApi = async () => {
+    try {
+      const result = await testApiConnection();
+      setApiTestResult(result);
+      console.log('API Test Result:', result);
+    } catch (error) {
+      console.error('API test failed:', error);
+      setApiTestResult({ error: error.message });
+    }
+  };
+
+  // Fetch initial events from backend
   useEffect(() => {
     const fetchEvents = async () => {
       setLoading(true);
       try {
-        const [schoolRes, otherRes, recommendedRes] = await Promise.all([
-          fetch('/api/search_events.php?q=school education'),
-          fetch('/api/search_events.php'),
-          fetch(`/api/search_events.php?location=${encodeURIComponent(userLocation)}`)
-        ]);
-
-        const [schoolData, otherData, recommendedData] = await Promise.all([
-          schoolRes.json(),
-          otherRes.json(),
-          recommendedRes.json()
-        ]);
-
-        setSchoolEvents(schoolData.events || []);
-        setOtherEvents(otherData.events || []);
-        setRecommendedEvents(recommendedData.events || []);
+        console.log('Fetching events from backend...');
+        const events = await getBackendEvents();
+        setSchoolEvents(events || []);
+        setOtherEvents(events || []);
+        setRecommendedEvents(events || []);
       } catch (error) {
-        console.error('Error fetching events:', error);
+        console.error('Error fetching events from backend:', error);
+        setSchoolEvents([]);
+        setOtherEvents([]);
+        setRecommendedEvents([]);
+        setApiTestResult({ error: 'Failed to load events from backend.' });
       } finally {
         setLoading(false);
       }
     };
-
     fetchEvents();
   }, []);
 
-  // Search effect
+  // Search effect - use Eventbrite API for search
   useEffect(() => {
     const searchEvents = async () => {
       if (!debouncedSearchQuery) {
@@ -105,9 +73,14 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
 
       setIsSearching(true);
       try {
-        const response = await fetch(`/api/search_events.php?q=${encodeURIComponent(debouncedSearchQuery)}`);
-        const data = await response.json();
-        setSearchResults(data.events || []);
+        // Use Eventbrite API for search
+        const events = await getEvents();
+        const filteredEvents = events.filter(event => 
+          event.name.text.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          (event.description && event.description.text && 
+           event.description.text.toLowerCase().includes(debouncedSearchQuery.toLowerCase()))
+        );
+        setSearchResults(filteredEvents);
       } catch (error) {
         console.error('Error searching events:', error);
         setSearchResults([]);
@@ -150,7 +123,40 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
             </Button>
           </div>
         </div>
+        
+        {/* Test API Button */}
+        <div className="absolute top-6 right-6">
+          <Button 
+            variant="outline" 
+            className="bg-white/90 hover:bg-white text-gray-900"
+            onClick={handleTestApi}
+          >
+            Test API
+          </Button>
+        </div>
       </div>
+
+      {/* Fallback UI for no events or error */}
+      {!loading && schoolEvents.length === 0 && otherEvents.length === 0 && recommendedEvents.length === 0 && (
+        <div className="p-6 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded-lg text-center mt-8">
+          <h2 className="text-2xl font-bold mb-2">No events found</h2>
+          <p className="mb-2">We couldn't load any events. This could be due to a backend issue or no events being available.</p>
+          {apiTestResult && apiTestResult.error && (
+            <p className="text-red-600">Error: {apiTestResult.error}</p>
+          )}
+          <Button className="mt-4" onClick={handleTestApi}>Test API Connection</Button>
+        </div>
+      )}
+
+      {/* API Test Results */}
+      {apiTestResult && (
+        <div className="p-4 bg-blue-50 rounded-lg">
+          <h3 className="font-semibold mb-2">API Test Results:</h3>
+          <pre className="text-sm overflow-auto max-h-40">
+            {JSON.stringify(apiTestResult, null, 2)}
+          </pre>
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="max-w-3xl mx-auto -mt-8 relative z-10">
@@ -180,14 +186,14 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
                 className="p-4 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
                 onClick={() => window.open(event.url, '_blank')}
               >
-                <h3 className="font-semibold text-gray-900">{event.name?.text || event.title}</h3>
+                <h3 className="font-semibold text-gray-900">{event.name.text}</h3>
                 <div className="flex items-center text-sm text-gray-500 mt-1">
                   <Calendar className="h-4 w-4 mr-1" />
-                  {event.start?.local ? new Date(event.start.local).toLocaleDateString() : event.date}
+                  {event.start.local ? new Date(event.start.local).toLocaleDateString() : 'Date TBD'}
                 </div>
                 <div className="flex items-center text-sm text-gray-500 mt-1">
                   <MapPin className="h-4 w-4 mr-1" />
-                  {event.venue?.address?.city || event.location || 'N/A'}
+                  {event.venue?.address?.city || 'Location TBD'}
                 </div>
               </div>
             ))}
@@ -199,13 +205,21 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
       <section className="mt-16">
         <div className="mb-8">
           <h2 className="text-4xl font-bold text-slate-900">Recommended for You</h2>
-          <p className="text-lg text-slate-600 mt-2">Based on your location in {userLocation}</p>
         </div>
+        
+        {/* Debug Info */}
+        <div className="mb-4 p-4 bg-gray-100 rounded">
+          <p>Loading: {loading.toString()}</p>
+          <p>Authenticated: true (using private token)</p>
+          <p>Recommended Events Count: {recommendedEvents.length}</p>
+          <p>Other Events Count: {otherEvents.length}</p>
+        </div>
+        
         {loading ? (
           <div className="h-64 flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        ) : (
+        ) : recommendedEvents.length > 0 ? (
           <Carousel className="w-full">
             <CarouselContent className="-ml-4">
               {recommendedEvents.map((event) => (
@@ -213,35 +227,23 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
                   <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer border-0">
                     <div className="relative group">
                       <img 
-                        src={event.logo?.url || event.image || '/default-event.jpg'} 
-                        alt={event.name?.text || event.title || 'Event'}
+                        src={event.logo?.url || '/default-event.jpg'} 
+                        alt={event.name.text}
                         className="w-full h-64 object-cover rounded-t-xl transition-transform duration-300 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-t-xl" />
                     </div>
                     <CardContent className="p-6">
-                      <h4 className="text-xl font-semibold text-slate-900 mb-3 line-clamp-2">{event.name?.text || event.title}</h4>
+                      <h4 className="text-xl font-semibold text-slate-900 mb-3 line-clamp-2">{event.name.text}</h4>
                       <div className="space-y-3 text-sm text-slate-600">
                         <div className="flex items-center">
                           <Calendar className="h-5 w-5 mr-2 text-blue-600" />
-                          {event.start?.local ? new Date(event.start.local).toLocaleDateString() : event.date}
+                          {event.start.local ? new Date(event.start.local).toLocaleDateString() : 'Date TBD'}
                         </div>
                         <div className="flex items-center">
                           <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-                          {event.venue?.address?.city || event.location || 'N/A'}
+                          {event.venue?.address?.city || 'Location TBD'}
                         </div>
-                        {event.price && (
-                          <div className="flex items-center">
-                            <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
-                            {event.price}
-                          </div>
-                        )}
-                        {event.rating && (
-                          <div className="flex items-center">
-                            <Star className="h-5 w-5 mr-2 text-yellow-400" />
-                            {event.rating}
-                          </div>
-                        )}
                       </div>
                       <Button className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
                         <a href={event.url} target="_blank" rel="noopener noreferrer">View Event</a>
@@ -254,6 +256,13 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
             <CarouselPrevious className="left-2" />
             <CarouselNext className="right-2" />
           </Carousel>
+        ) : (
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-lg text-gray-500 mb-4">No recommended events found</p>
+              <p className="text-sm text-gray-400">Try checking back later or browse other events</p>
+            </div>
+          </div>
         )}
       </section>
 
@@ -263,11 +272,18 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
           <h2 className="text-4xl font-bold text-slate-900">Other Events</h2>
           <p className="text-lg text-slate-600 mt-2">Discover more events in your area</p>
         </div>
+        
+        {/* Debug Info */}
+        <div className="mb-4 p-4 bg-gray-100 rounded">
+          <p>Loading: {loading.toString()}</p>
+          <p>Other Events Count: {otherEvents.length}</p>
+        </div>
+        
         {loading ? (
           <div className="h-64 flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        ) : (
+        ) : otherEvents.length > 0 ? (
           <Carousel className="w-full">
             <CarouselContent className="-ml-4">
               {otherEvents.map((event) => (
@@ -275,29 +291,23 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
                   <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer border-0">
                     <div className="relative group">
                       <img 
-                        src={event.logo?.url || event.image || '/default-event.jpg'} 
-                        alt={event.name?.text || event.title || 'Event'}
+                        src={event.logo?.url || '/default-event.jpg'} 
+                        alt={event.name.text}
                         className="w-full h-64 object-cover rounded-t-xl transition-transform duration-300 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-t-xl" />
                     </div>
                     <CardContent className="p-6">
-                      <h4 className="text-xl font-semibold text-slate-900 mb-3 line-clamp-2">{event.name?.text || event.title}</h4>
+                      <h4 className="text-xl font-semibold text-slate-900 mb-3 line-clamp-2">{event.name.text}</h4>
                       <div className="space-y-3 text-sm text-slate-600">
                         <div className="flex items-center">
                           <Calendar className="h-5 w-5 mr-2 text-blue-600" />
-                          {event.start?.local ? new Date(event.start.local).toLocaleDateString() : event.date}
+                          {event.start.local ? new Date(event.start.local).toLocaleDateString() : 'Date TBD'}
                         </div>
                         <div className="flex items-center">
                           <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-                          {event.venue?.address?.city || event.location || 'N/A'}
+                          {event.venue?.address?.city || 'Location TBD'}
                         </div>
-                        {event.price && (
-                          <div className="flex items-center">
-                            <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
-                            {event.price}
-                          </div>
-                        )}
                       </div>
                       <Button className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
                         <a href={event.url} target="_blank" rel="noopener noreferrer">View Event</a>
@@ -310,6 +320,13 @@ const Dashboard = ({ onPageChange }: DashboardProps) => {
             <CarouselPrevious className="left-2" />
             <CarouselNext className="right-2" />
           </Carousel>
+        ) : (
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-lg text-gray-500 mb-4">No other events found</p>
+              <p className="text-sm text-gray-400">Try checking back later or create your own event</p>
+            </div>
+          </div>
         )}
       </section>
     </div>
